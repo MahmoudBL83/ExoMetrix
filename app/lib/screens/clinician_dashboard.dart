@@ -15,18 +15,14 @@ class _ClinicianDashboardState extends State<ClinicianDashboard> {
   int tick = 0;
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final bleData = context.watch<BluetoothHandler>();
 
-    // Add new data point whenever the angle updates (and keeps window to 30 elements max)
+    // Add new data point whenever the angle updates
     if (dataPoints.length > 50) {
       dataPoints.removeAt(0);
     }
+    // Only update if there's actual new mocking data or BLE data
     dataPoints.add(FlSpot(tick.toDouble(), bleData.currentAngle));
     tick++;
 
@@ -39,19 +35,32 @@ class _ClinicianDashboardState extends State<ClinicianDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Realtime Knee Angle log',
-              style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+               Text(
+                  'Realtime Knee Angle log',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                Text(
+                  bleData.isConnected ? '● Connected' : '○ Disconnected',
+                  style: TextStyle(
+                    color: bleData.isConnected ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Expanded(
+              flex: 2,
               child: LineChart(
                 LineChartData(
                   minY: -20,
-                  maxY: 160,
+                  maxY: 180,
                   titlesData: const FlTitlesData(
                     bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false), // Hide timeline for cleaner view
+                      sideTitles: SideTitles(showTitles: false), // Hide timeline
                     ),
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
@@ -81,12 +90,39 @@ class _ClinicianDashboardState extends State<ClinicianDashboard> {
               ),
             ),
             const SizedBox(height: 20),
-            const Card(
-              child: ListTile(
-                leading: Icon(Icons.analytics),
-                title: Text('Session Stability Score'),
-                subtitle: Text('85/100'),
-                trailing: Text('Normal Risk'),
+            Expanded(
+              flex: 1,
+              child: ListView(
+                children: [
+                 Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.analytics, color: Colors.blue),
+                      title: const Text('Session Stability Score'),
+                      subtitle: Text('\ / 100'),
+                      trailing: Text(
+                        bleData.stabilityScore > 80 ? 'Low Risk' : 'High Risk',
+                        style: TextStyle(
+                          color: bleData.stabilityScore > 80 ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.check_circle_outline, color: Colors.green),
+                      title: const Text('Target Adherence'),
+                      subtitle: Text('Good: \ | Bad: \'),
+                    ),
+                  ),
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.hardware, color: Colors.purple),
+                      title: const Text('Assistance Prediction'),
+                      subtitle: Text('Patient needs \% mechanical assistance'),
+                    ),
+                  ),
+                ],
               ),
             )
           ],

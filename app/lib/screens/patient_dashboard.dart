@@ -30,10 +30,31 @@ class PatientDashboard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Current Angle: ${bleData.currentAngle.toStringAsFixed(1)}°',
-              style: Theme.of(context).textTheme.headlineMedium,
+              'Current Angle: \°',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 20),
+            
+            // Show latest AI classification feedback
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: bleData.lastClassification == 'Good step' 
+                    ? Colors.green.withOpacity(0.2) 
+                    : Colors.red.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                bleData.lastClassification,
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: bleData.lastClassification == 'Good step' ? Colors.green[800] : Colors.red[800],
+                ),
+              ),
             ),
             const SizedBox(height: 40),
+
             // Gamified visualization placeholder (Stick figure leg)
             SizedBox(
               width: 200,
@@ -43,9 +64,15 @@ class PatientDashboard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 40),
-            const Text(
-              'Points: 0',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
+            
+            Text(
+              'Points: \',
+              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+             const SizedBox(height: 10),
+             Text(
+              'Total Steps Analyzed: \',
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ],
         ),

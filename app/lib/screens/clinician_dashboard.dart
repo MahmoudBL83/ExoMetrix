@@ -98,7 +98,7 @@ class _ClinicianDashboardState extends State<ClinicianDashboard> {
                     child: ListTile(
                       leading: const Icon(Icons.analytics, color: Colors.blue),
                       title: const Text('Session Stability Score'),
-                      subtitle: Text('\ / 100'),
+                      subtitle: Text('${bleData.stabilityScore.toStringAsFixed(1)} / 100'),
                       trailing: Text(
                         bleData.stabilityScore > 80 ? 'Low Risk' : 'High Risk',
                         style: TextStyle(
@@ -112,14 +112,14 @@ class _ClinicianDashboardState extends State<ClinicianDashboard> {
                     child: ListTile(
                       leading: const Icon(Icons.check_circle_outline, color: Colors.green),
                       title: const Text('Target Adherence'),
-                      subtitle: Text('Good: \ | Bad: \'),
+                      subtitle: Text('Good: ${bleData.goodSteps} | Bad: ${bleData.badSteps}'),
                     ),
                   ),
                   Card(
                     child: ListTile(
                       leading: const Icon(Icons.hardware, color: Colors.purple),
                       title: const Text('Assistance Prediction'),
-                      subtitle: Text('Patient needs \% mechanical assistance'),
+                      subtitle: Text('Patient needs ${bleData.lastAssistance}% mechanical assistance'),
                     ),
                   ),
                 ],

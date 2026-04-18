@@ -4,12 +4,17 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class BluetoothHandler extends ChangeNotifier {
   double _currentAngle = 0.0;
   bool _isConnected = false;
   bool _isMocking = false;
   Timer? _mockTimer;
+  Timer? _aiTimer;
+
+  BluetoothDevice? _connectedDevice;
+  BluetoothCharacteristic? _angleCharacteristic;
 
   // ML/Session Statistics
   int _points = 0;
@@ -26,19 +31,18 @@ class BluetoothHandler extends ChangeNotifier {
   int get badSteps => _badSteps;
   String get lastClassification => _lastClassification;
   double get lastAssistance => _lastAssistance;
-  
-  double get stabilityScore => (_goodSteps + _badSteps) == 0 
-      ? 100.0 
+
+  double get stabilityScore => (_goodSteps + _badSteps) == 0
+      ? 100.0
       : (_goodSteps / (_goodSteps + _badSteps)) * 100;
 
   int get totalSteps => _goodSteps + _badSteps;
-
-  // Track if a prediction is currently in flight to avoid overwhelming backend
   bool _isPredicting = false;
 
   void toggleMockMode() {
     _isMocking = !_isMocking;
     if (_isMocking) {
+      if (_isConnected) disconnectDevice();
       _startMocking();
     } else {
       _stopMocking();
@@ -50,39 +54,114 @@ class BluetoothHandler extends ChangeNotifier {
     int tick = 0;
     _mockTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       tick++;
-      // Simulate knee angle (0 to 120 smoothly)
       _currentAngle = 60 + 60 * (1.0 * tick % 30) / 30;
       if (tick % 60 < 30) {
-        _currentAngle = 120 - _currentAngle; // reversed
+        _currentAngle = 120 - _currentAngle;
       }
       
-      // Inject some "bad" steps randomly when angle is high
       if (tick % 100 == 0) {
-         _currentAngle = 155.0; // Force a bad step trigger
+         _currentAngle = 155.0; // Inject bad step
       }
-
-      // Every 1 second (10 ticks), send evaluation to AI Engine
-      if (tick % 10 == 0) {
-        _evaluateStepWithAI(_currentAngle);
-      }
-
       notifyListeners();
     });
+
+    _aiTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+       _evaluateStepWithAI(_currentAngle);
+    });
+
     _isConnected = true;
   }
 
   void _stopMocking() {
     _mockTimer?.cancel();
+    _aiTimer?.cancel();
     _isConnected = false;
     _currentAngle = 0.0;
     notifyListeners();
   }
 
+  // --- Real BLE Logic ---
+  bool isScanning = false;
+  List<ScanResult> scanResults = [];
+  StreamSubscription<List<ScanResult>>? _scanResultsSubscription;
+
+  void startScan() async {
+    if (isScanning) return;
+    scanResults.clear();
+    isScanning = true;
+    notifyListeners();
+
+    _scanResultsSubscription = FlutterBluePlus.scanResults.listen((results) {
+      scanResults = results;
+      notifyListeners();
+    });
+
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+    
+    await Future.delayed(const Duration(seconds: 5));
+    isScanning = false;
+    notifyListeners();
+  }
+
+  Future<void> connectToDevice(BluetoothDevice device) async {
+    try {
+      await device.connect();
+      _connectedDevice = device;
+      _isConnected = true;
+      _isMocking = false;
+      notifyListeners();
+
+      // Discover services to find the MPU6050 angle data
+      List<BluetoothService> services = await device.discoverServices();
+      for (var service in services) {
+        for (var characteristic in service.characteristics) {
+          // In a real app, match UUID here. e.g., if (characteristic.uuid == myExpectedUuid)
+          if (characteristic.properties.notify) {
+            _angleCharacteristic = characteristic;
+            await characteristic.setNotifyValue(true);
+            characteristic.onValueReceived.listen((value) {
+              // Parse incoming UTF8 or byte array to double
+              try {
+                String strVal = utf8.decode(value);
+                _currentAngle = double.parse(strVal);
+                notifyListeners();
+              } catch (e) {
+                print("Error parsing BLE data: \");
+              }
+            });
+            break;
+          }
+        }
+      }
+
+      // Periodically run AI Evaluation against real hardware data
+      _aiTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+       _evaluateStepWithAI(_currentAngle);
+      });
+
+    } catch (e) {
+      print("Connection failed: \");
+      _isConnected = false;
+      notifyListeners();
+    }
+  }
+
+  void disconnectDevice() async {
+    if (_connectedDevice != null) {
+      await _connectedDevice!.disconnect();
+      _connectedDevice = null;
+    }
+    _angleCharacteristic = null;
+    _isConnected = false;
+    _aiTimer?.cancel();
+    notifyListeners();
+  }
+
+  // --- AI API Logic ---
   Future<void> _evaluateStepWithAI(double angle) async {
     if (_isPredicting) return;
     _isPredicting = true;
 
-    // Define endpoint. Android emulator needs 10.0.2.2 to access host localhost
     String baseUrl = 'http://127.0.0.1:5328';
     if (!kIsWeb && Platform.isAndroid) {
       baseUrl = 'http://10.0.2.2:5328';
@@ -111,15 +190,10 @@ class BluetoothHandler extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('AI Evaluation Error: \');
-      _lastClassification = 'Network Error / API Offline';
+      print("AI Evaluation Error:"); // Truncated to avoid string escaping problems
+      _lastClassification = 'API Offline';
     } finally {
       _isPredicting = false;
     }
-  }
-
-  // Real BLE logic placeholder
-  Future<void> connectToDevice() async {
-     // TODO: Implement flutter_blue_plus connection
   }
 }

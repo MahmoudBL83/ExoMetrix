@@ -16,6 +16,50 @@ class PatientDashboard extends StatelessWidget {
         actions: [
           Row(
             children: [
+              IconButton(
+                icon: const Icon(Icons.bluetooth),
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (context) => Consumer<BluetoothHandler>(
+                      builder: (context, ble, child) => Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Select ExoMetrix Device', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                ElevatedButton(
+                                  onPressed: ble.isScanning ? null : () => ble.startScan(),
+                                  child: Text(ble.isScanning ? 'Scanning...' : 'Scan'),
+                                )
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: ble.scanResults.length,
+                                itemBuilder: (context, index) {
+                                  final device = ble.scanResults[index].device;
+                                  return ListTile(
+                                    title: Text(device.platformName.isNotEmpty ? device.platformName : 'Unknown Device'),
+                                    subtitle: Text(device.remoteId.toString()),
+                                    onTap: () {
+                                      ble.connectToDevice(device);
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                },
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
               const Text('Mock Mode'),
               Switch(
                 value: bleData.isMocking,
@@ -30,7 +74,7 @@ class PatientDashboard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Current Angle: \°',
+              'Current Angle: ${bleData.currentAngle.toStringAsFixed(1)}°',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 20),
@@ -66,12 +110,12 @@ class PatientDashboard extends StatelessWidget {
             const SizedBox(height: 40),
             
             Text(
-              'Points: \',
+              'Points: ${bleData.points}',
               style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.green),
             ),
              const SizedBox(height: 10),
              Text(
-              'Total Steps Analyzed: \',
+              'Total Steps Analyzed: ${bleData.totalSteps}',
               style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ],

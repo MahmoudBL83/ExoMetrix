@@ -105,7 +105,7 @@ class BluetoothHandler extends ChangeNotifier {
 
   Future<void> connectToDevice(BluetoothDevice device) async {
     try {
-      await device.connect();
+      await device.connect(license: License.free);
       _connectedDevice = device;
       _isConnected = true;
       _isMocking = false;
@@ -126,7 +126,7 @@ class BluetoothHandler extends ChangeNotifier {
                 _currentAngle = double.parse(strVal);
                 notifyListeners();
               } catch (e) {
-                print("Error parsing BLE data: \");
+                print("Error parsing BLE data: $e");
               }
             });
             break;
@@ -140,7 +140,7 @@ class BluetoothHandler extends ChangeNotifier {
       });
 
     } catch (e) {
-      print("Connection failed: \");
+      print("Connection failed: $e");
       _isConnected = false;
       notifyListeners();
     }
@@ -169,7 +169,7 @@ class BluetoothHandler extends ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('\/api/predict'),
+        Uri.parse('$baseUrl/api/predict'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'angle': angle}),
       ).timeout(const Duration(seconds: 2));

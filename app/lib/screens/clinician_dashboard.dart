@@ -27,106 +27,273 @@ class _ClinicianDashboardState extends State<ClinicianDashboard> {
     tick++;
 
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Clinician Dashboard'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: const Text('Clinician Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-               Text(
-                  'Realtime Knee Angle log',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                Text(
-                  bleData.isConnected ? '● Connected' : '○ Disconnected',
-                  style: TextStyle(
-                    color: bleData.isConnected ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              flex: 2,
-              child: LineChart(
-                LineChartData(
-                  minY: -20,
-                  maxY: 180,
-                  titlesData: const FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false), // Hide timeline
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 40,
-                      ),
-                    ),
-                    topTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: true),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: dataPoints,
-                      isCurved: true,
-                      color: Colors.redAccent,
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: const FlDotData(show: false),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              flex: 1,
-              child: ListView(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header & Status
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                 Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.analytics, color: Colors.blue),
-                      title: const Text('Session Stability Score'),
-                      subtitle: Text('${bleData.stabilityScore.toStringAsFixed(1)} / 100'),
-                      trailing: Text(
-                        bleData.stabilityScore > 80 ? 'Low Risk' : 'High Risk',
-                        style: TextStyle(
-                          color: bleData.stabilityScore > 80 ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.bold,
+                  const Text(
+                    'Realtime Kinematics',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: bleData.isConnected ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          bleData.isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                          size: 16,
+                          color: bleData.isConnected ? Colors.green : Colors.red,
                         ),
-                      ),
-                    ),
-                  ),
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.check_circle_outline, color: Colors.green),
-                      title: const Text('Target Adherence'),
-                      subtitle: Text('Good: ${bleData.goodSteps} | Bad: ${bleData.badSteps}'),
-                    ),
-                  ),
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.hardware, color: Colors.purple),
-                      title: const Text('Assistance Prediction'),
-                      subtitle: Text('Patient needs ${bleData.lastAssistance}% mechanical assistance'),
+                        const SizedBox(width: 6),
+                        Text(
+                          bleData.isConnected ? 'Connected' : 'Disconnected',
+                          style: TextStyle(
+                            color: bleData.isConnected ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            )
-          ],
+              const SizedBox(height: 24),
+              
+              // Chart Card
+              Container(
+                height: 280,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Knee Angle Log',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: LineChart(
+                        LineChartData(
+                          minY: -20,
+                          maxY: 180,
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                            horizontalInterval: 40,
+                            getDrawingHorizontalLine: (value) {
+                              return FlLine(
+                                color: Colors.grey.withOpacity(0.15),
+                                strokeWidth: 1,
+                              );
+                            },
+                          ),
+                          titlesData: FlTitlesData(
+                            bottomTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 40,
+                                getTitlesWidget: (value, meta) {
+                                  return Text(
+                                    value.toInt().toString(),
+                                    style: TextStyle(
+                                      color: Colors.grey[500],
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                          ),
+                          borderData: FlBorderData(show: false),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: dataPoints,
+                              isCurved: true,
+                              curveSmoothness: 0.3,
+                              color: Colors.blueAccent,
+                              barWidth: 4,
+                              isStrokeCapRound: true,
+                              dotData: const FlDotData(show: false),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.blueAccent.withOpacity(0.3),
+                                    Colors.blueAccent.withOpacity(0.0),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // KPI Grid
+              GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 1.1,
+                children: [
+                  _buildStatCard(
+                    context,
+                    title: 'Stability Score',
+                    value: '${bleData.stabilityScore.toStringAsFixed(1)}',
+                    subtitle: bleData.stabilityScore > 80 ? 'Low Risk' : 'High Risk',
+                    icon: Icons.monitor_heart_outlined,
+                    color: bleData.stabilityScore > 80 ? Colors.green : Colors.orange,
+                  ),
+                  _buildStatCard(
+                    context,
+                    title: 'Mechanical Assist',
+                    value: '${bleData.lastAssistance}%',
+                    subtitle: 'Predicted needs',
+                    icon: Icons.precision_manufacturing_outlined,
+                    color: Colors.purple,
+                  ),
+                  _buildStatCard(
+                    context,
+                    title: 'Good Steps',
+                    value: '${bleData.goodSteps}',
+                    subtitle: 'Target adherence',
+                    icon: Icons.check_circle_outline,
+                    color: Colors.blue,
+                  ),
+                  _buildStatCard(
+                    context,
+                    title: 'Compensations',
+                    value: '${bleData.badSteps}',
+                    subtitle: 'Requires attention',
+                    icon: Icons.warning_amber_rounded,
+                    color: Colors.redAccent,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[800],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[500],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

@@ -1,5 +1,47 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Python ML API (AB06 Model)
+
+The Flask API in `api/index.py` can use a trained model from the AB06 biomechanics dataset.
+
+### 1) Install Python dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2) Train model from AB06 dataset
+
+From `backend/`, run:
+
+```bash
+python ml/train_gait_model.py --dataset-root ../AB06
+```
+
+This generates:
+
+- `models/gait_model.joblib`
+- `models/gait_model_meta.json`
+
+### 3) Run Flask API
+
+```bash
+python api/index.py
+```
+
+### 4) Verify model status
+
+```bash
+GET http://127.0.0.1:5328/api/model/status
+```
+
+### 5) Predict from live angle
+
+```bash
+POST http://127.0.0.1:5328/api/predict
+{ "angle": 45.0 }
+```
+
 ## Getting Started
 
 First, run the development server:

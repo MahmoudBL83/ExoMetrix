@@ -1,10 +1,27 @@
-from flask import Flask, request, jsonify
-import random
-# In a real scenario, you'd load your scikit-learn model here
-# import joblib
-# model = joblib.load('model.pkl')
+import os
+import sys
+from pathlib import Path
+
+from flask import Flask, jsonify, request
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.append(str(BACKEND_ROOT))
+
+from ml.model_runtime import GaitModelRuntime
 
 app = Flask(__name__)
+
+MODEL_PATH = os.getenv(
+    'EXOMETRIX_MODEL_PATH',
+    str(BACKEND_ROOT / 'models' / 'gait_model.joblib'),
+)
+runtime = GaitModelRuntime(MODEL_PATH)
+
+
+@app.route('/api/model/status', methods=['GET'])
+def model_status():
+    return jsonify(runtime.status())
 
 @app.route('/api/predict', methods=['POST'])
 def predict():
@@ -14,22 +31,18 @@ def predict():
         return jsonify({'error': 'No angle data provided'}), 400
         
     angle = float(data.get('angle', 0.0))
-    
-    # Placeholder ML simulation:
-    # If angle is within a "normal" knee bend range (e.g., 0-140 degrees), it's good.
-    # We will simulate assistance prediction as well.
-    classification = "Good step"
-    assistance_percent = 0
-    
-    if angle < -10 or angle > 150:
-        classification = "Compensating (bad) step"
-        assistance_percent = round(random.uniform(20.0, 50.0), 1)
+    result = runtime.predict(angle)
 
     return jsonify({
-        'classification': classification,
-        'assistance_percent': assistance_percent,
+        'classification': result['classification'],
+        'assistance_percent': result['assistance_percent'],
+        'anomaly_score': result.get('anomaly_score', 0.0),
+        'model_loaded': result.get('model_loaded', False),
         'received_angle': angle
     })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5328)
+    host = os.getenv('EXOMETRIX_HOST', '0.0.0.0')
+    port = int(os.getenv('EXOMETRIX_PORT', '5328'))
+    debug = os.getenv('EXOMETRIX_DEBUG', 'false').lower() == 'true'
+    app.run(host=host, port=port, debug=debug)

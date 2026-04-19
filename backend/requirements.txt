@@ -2,3 +2,6 @@ Flask
 scikit-learn
 pandas
 numpy
+scipy
+h5py
+joblib

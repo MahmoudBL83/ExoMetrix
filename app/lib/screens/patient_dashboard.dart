@@ -6,9 +6,105 @@ import 'dart:math' as math;
 class PatientDashboard extends StatelessWidget {
   const PatientDashboard({super.key});
 
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes}m ${seconds.toString().padLeft(2, '0')}s';
+  }
+
+  List<double> _parseAngles(String input) {
+    final matches = RegExp(r'-?\d+(?:\.\d+)?').allMatches(input);
+    return matches
+        .map((match) => double.tryParse(match.group(0) ?? ''))
+        .whereType<double>()
+        .map((value) => value.clamp(0.0, 180.0).toDouble())
+        .toList(growable: false);
+  }
+
+  void _showSimulationDialog(BuildContext context, BluetoothHandler bleData) {
+    final controller = TextEditingController(
+      text: '30, 45, 60, 75, 90, 110, 140, 100, 70, 50',
+    );
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Run Angle Simulation'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: controller,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  hintText: 'Enter angles like: 30,45,60,90,120',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'This streams your angles to the backend model (not mock fallback).',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            if (bleData.isSimulating)
+              TextButton(
+                onPressed: () {
+                  bleData.stopSimulation();
+                  Navigator.of(dialogContext).pop();
+                },
+                child: const Text('Stop Simulation'),
+              ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final angles = _parseAngles(controller.text);
+                if (angles.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter at least one valid angle.'),
+                    ),
+                  );
+                  return;
+                }
+
+                bleData.startSimulation(angles);
+                Navigator.of(dialogContext).pop();
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Simulation started with ${angles.length} angles',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Run Simulation'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bleData = context.watch<BluetoothHandler>();
+    final isGoodStep = bleData.lastClassification == 'Good step';
+    final isInfoState = bleData.lastClassification == 'Waiting for data...' ||
+        bleData.lastClassification.startsWith('Backend online');
 
     return Scaffold(
       backgroundColor: Colors.blue[50],
@@ -16,7 +112,8 @@ class PatientDashboard extends StatelessWidget {
         elevation: 0,
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.black87,
-        title: const Text('ExoMetrix Training', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('ExoMetrix Training',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           Row(
@@ -27,7 +124,8 @@ class PatientDashboard extends StatelessWidget {
                   showModalBottomSheet(
                     context: context,
                     shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(24)),
                     ),
                     builder: (context) => Consumer<BluetoothHandler>(
                       builder: (context, ble, child) => Container(
@@ -38,33 +136,53 @@ class PatientDashboard extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('ExoMetrix Devices', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                                const Text('ExoMetrix Devices',
+                                    style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold)),
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(20)),
                                   ),
-                                  onPressed: ble.isScanning ? null : () => ble.startScan(),
-                                  icon: ble.isScanning 
-                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
+                                  onPressed: ble.isScanning
+                                      ? null
+                                      : () => ble.startScan(),
+                                  icon: ble.isScanning
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2))
                                       : const Icon(Icons.search, size: 18),
-                                  label: Text(ble.isScanning ? 'Scanning...' : 'Scan'),
+                                  label: Text(
+                                      ble.isScanning ? 'Scanning...' : 'Scan'),
                                 )
                               ],
                             ),
                             const SizedBox(height: 20),
                             Expanded(
                               child: ListView.separated(
-                                separatorBuilder: (context, index) => const Divider(),
+                                separatorBuilder: (context, index) =>
+                                    const Divider(),
                                 itemCount: ble.scanResults.length,
                                 itemBuilder: (context, index) {
                                   final device = ble.scanResults[index].device;
                                   return ListTile(
                                     leading: const CircleAvatar(
                                       backgroundColor: Colors.blueAccent,
-                                      child: Icon(Icons.bluetooth, color: Colors.white),
+                                      child: Icon(Icons.bluetooth,
+                                          color: Colors.white),
                                     ),
-                                    title: Text(device.platformName.isNotEmpty ? device.platformName : 'Unknown Device', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    subtitle: Text(device.remoteId.toString(), style: const TextStyle(fontSize: 12)),
+                                    title: Text(
+                                        device.platformName.isNotEmpty
+                                            ? device.platformName
+                                            : 'Unknown Device',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    subtitle: Text(device.remoteId.toString(),
+                                        style: const TextStyle(fontSize: 12)),
                                     trailing: const Icon(Icons.chevron_right),
                                     onTap: () {
                                       ble.connectToDevice(device);
@@ -81,6 +199,13 @@ class PatientDashboard extends StatelessWidget {
                   );
                 },
               ),
+              IconButton(
+                tooltip: 'Run simulation angles',
+                icon: Icon(
+                  bleData.isSimulating ? Icons.play_circle : Icons.play_arrow,
+                ),
+                onPressed: () => _showSimulationDialog(context, bleData),
+              ),
               Switch(
                 value: bleData.isMocking,
                 activeColor: Colors.blueAccent,
@@ -94,7 +219,8 @@ class PatientDashboard extends StatelessWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -111,7 +237,7 @@ class PatientDashboard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blueAccent.withOpacity(0.3),
+                        color: Colors.blueAccent.withValues(alpha: 0.3),
                         blurRadius: 15,
                         offset: const Offset(0, 8),
                       ),
@@ -121,23 +247,31 @@ class PatientDashboard extends StatelessWidget {
                     children: [
                       const Text(
                         'Total Score',
-                        style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         '${bleData.points}',
-                        style: const TextStyle(fontSize: 56, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                            fontSize: 56,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           'Level 1 Participant',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -148,16 +282,21 @@ class PatientDashboard extends StatelessWidget {
                 // AI Feedback Indicator
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
-                    color: bleData.lastClassification == 'Good step' 
-                        ? Colors.green.withOpacity(0.15) 
-                        : Colors.orange.withOpacity(0.15),
+                    color: isGoodStep
+                        ? Colors.green.withValues(alpha: 0.15)
+                        : isInfoState
+                            ? Colors.blue.withValues(alpha: 0.12)
+                            : Colors.orange.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
-                      color: bleData.lastClassification == 'Good step' 
-                        ? Colors.green.withOpacity(0.5) 
-                        : Colors.orange.withOpacity(0.5),
+                      color: isGoodStep
+                          ? Colors.green.withValues(alpha: 0.5)
+                          : isInfoState
+                              ? Colors.blue.withValues(alpha: 0.4)
+                              : Colors.orange.withValues(alpha: 0.5),
                       width: 2,
                     ),
                   ),
@@ -165,16 +304,28 @@ class PatientDashboard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        bleData.lastClassification == 'Good step' ? Icons.check_circle : Icons.warning_rounded,
-                        color: bleData.lastClassification == 'Good step' ? Colors.green[700] : Colors.orange[700],
+                        isGoodStep
+                            ? Icons.check_circle
+                            : isInfoState
+                                ? Icons.info_outline
+                                : Icons.warning_rounded,
+                        color: isGoodStep
+                            ? Colors.green[700]
+                            : isInfoState
+                                ? Colors.blue[700]
+                                : Colors.orange[700],
                       ),
                       const SizedBox(width: 8),
                       Text(
                         bleData.lastClassification,
                         style: TextStyle(
-                          fontSize: 18, 
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: bleData.lastClassification == 'Good step' ? Colors.green[800] : Colors.orange[800],
+                          color: isGoodStep
+                              ? Colors.green[800]
+                              : isInfoState
+                                  ? Colors.blue[800]
+                                  : Colors.orange[800],
                         ),
                       ),
                     ],
@@ -194,7 +345,7 @@ class PatientDashboard extends StatelessWidget {
                         color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -205,20 +356,23 @@ class PatientDashboard extends StatelessWidget {
                       width: 200,
                       height: 200,
                       child: CustomPaint(
-                        painter: StickFigureLegPainter(angle: bleData.currentAngle),
+                        painter:
+                            StickFigureLegPainter(angle: bleData.currentAngle),
                       ),
                     ),
                     Positioned(
                       bottom: 20,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.black87,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '${bleData.currentAngle.toStringAsFixed(1)}°',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -230,8 +384,12 @@ class PatientDashboard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildMiniStat('Steps Analyzed', '${bleData.totalSteps}', Icons.directions_walk),
-                    _buildMiniStat('Session Time', '12m', Icons.timer_outlined),
+                    _buildMiniStat('Steps Analyzed', '${bleData.totalSteps}',
+                        Icons.directions_walk),
+                    _buildMiniStat(
+                        'Session Time',
+                        _formatDuration(bleData.sessionDuration),
+                        Icons.timer_outlined),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -253,7 +411,7 @@ class PatientDashboard extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -264,11 +422,15 @@ class PatientDashboard extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+          style: const TextStyle(
+              fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
         ),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600),
         ),
       ],
     );
@@ -301,7 +463,7 @@ class StickFigureLegPainter extends CustomPainter {
     final radians = angle * (math.pi / 180);
     final ankleY = math.cos(radians) * 80 + offsetKnee.dy;
     final ankleX = math.sin(radians) * 80 + offsetKnee.dx;
-    
+
     final offsetAnkle = Offset(ankleX, ankleY);
 
     // Thigh

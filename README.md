@@ -6,7 +6,7 @@ It combines:
 
 - A Flutter mobile app for patients and clinicians.
 - A Flask backend for prediction APIs.
-- A machine learning model trained on AB06 biomechanics data.
+- A machine learning model trained on AB06, AB07, and AB08 biomechanics data.
 
 ## What The System Does
 
@@ -22,7 +22,7 @@ It combines:
 
 - `app/`: Flutter mobile application.
 - `backend/`: Flask API + ML training/runtime.
-- `AB06/`: biomechanics dataset used for training.
+- `AB06/`, `AB07/`, `AB08/`: biomechanics subject datasets used for training.
 
 ## Mobile Application
 
@@ -113,11 +113,18 @@ Runtime inference:
 
 ### Data Pipeline
 
-1. Reads AB06 MAT files, focusing on gait sensor sources (`gon/*.mat`).
+1. Reads AB06/AB07/AB08 MAT files, focusing on gait sensor sources (`gon/*.mat`).
 2. Attempts recursive numeric extraction from MATLAB structures.
 3. Uses fallback decoder for opaque MATLAB table/MCOS files via `__function_workspace__` bytes.
 4. Selects the most plausible angle-like signal.
 5. Calibrates extracted values to app range and clips to 0-180 degrees.
+
+### Dataset Reference
+
+The AB06/AB07/AB08 biomechanics data used in this project is sourced from:
+
+- Open-source biomechanics dataset (Camargo et al., Georgia Tech):
+  https://www.epic.gatech.edu/opensource-biomechanics-camargo-et-al/
 
 ### Model Architecture
 
@@ -132,13 +139,41 @@ Training hyperparameters:
 - `random_state=42`
 - `n_jobs=-1`
 
-### Trained Metadata (Current)
+### Latest Training Results (Detailed)
+
+Latest full-subject training command:
+
+```bash
+python ml/train_gait_model.py --dataset-root ..
+```
+
+Subjects included:
+
+| Subject | Samples Used |
+| --- | ---: |
+| AB06 | 286000 |
+| AB07 | 306000 |
+| AB08 | 276000 |
+| **Total** | **868000** |
 
 From `backend/models/gait_model_meta.json`:
 
+- `source`: `..`
+- `source_subjects`: `AB06`, `AB07`, `AB08`
+- `subject_count`: `3`
+- `sample_count`: `868000`
 - `model_type`: `IsolationForest`
-- `sample_count`: `286000`
 - `data_decoder`: `function_workspace_f64_fallback`
+
+Saved distribution details:
+
+- `mean`: `54.15693278040778`
+- `std`: `19.653112667434243`
+- `median`: `50.55400084036509`
+- `p01`: `-0.11288378310291602`
+- `p05`: `-0.027273384084572028`
+- `p50`: `0.17783686367663987`
+- `p99`: `120.0`
 
 ### Runtime Decision Logic
 
@@ -155,8 +190,16 @@ From `backend/`:
 
 ```bash
 pip install -r requirements.txt
-python ml/train_gait_model.py --dataset-root ../AB06
+python ml/train_gait_model.py --dataset-root ..
 python api/index.py
+```
+
+The training script now auto-discovers subject folders (for example `AB06`, `AB07`, `AB08`) when you pass a parent root.
+
+If you want to train on only one subject, run for example:
+
+```bash
+python ml/train_gait_model.py --dataset-root ../AB06
 ```
 
 Optional environment variables:

@@ -1,0 +1,24 @@
+{
+  "source": "..",
+  "source_subjects": [
+    "AB06",
+    "AB07",
+    "AB08"
+  ],
+  "subject_count": 3,
+  "samples_per_subject": {
+    "AB06": 286000,
+    "AB07": 306000,
+    "AB08": 276000
+  },
+  "sample_count": 868000,
+  "model_type": "IsolationForest",
+  "data_decoder": "function_workspace_f64_fallback",
+  "mean": 54.15693278040778,
+  "std": 19.653112667434243,
+  "median": 50.55400084036509,
+  "p01": -0.11288378310291602,
+  "p99": 120.0,
+  "p05": -0.027273384084572028,
+  "p50": 0.17783686367663987
+}

@@ -11,9 +11,53 @@
     "AB07": 306000,
     "AB08": 276000
   },
+  "feature_rows_per_subject": {
+    "AB06": 143,
+    "AB07": 153,
+    "AB08": 138
+  },
   "sample_count": 868000,
   "model_type": "IsolationForest",
   "data_decoder": "function_workspace_f64_fallback",
+  "supports_activity_classification": true,
+  "supports_intention_classification": true,
+  "activity_label_counts": {
+    "levelground": 97,
+    "ramp": 193,
+    "stair": 120,
+    "treadmill": 24
+  },
+  "intention_label_counts": {
+    "ramp_up": 193,
+    "running": 31,
+    "upstairs": 120,
+    "walking": 90
+  },
+  "activity_classifier_metrics": {
+    "classes": [
+      "levelground",
+      "ramp",
+      "stair",
+      "treadmill"
+    ],
+    "val_accuracy": 0.9310344827586207
+  },
+  "intention_classifier_metrics": {
+    "classes": [
+      "ramp_up",
+      "running",
+      "upstairs",
+      "walking"
+    ],
+    "val_accuracy": 0.9310344827586207
+  },
+  "intention_mapping_policy": {
+    "levelground_fast": "running",
+    "levelground_normal_or_slow": "walking",
+    "stair": "upstairs",
+    "ramp": "ramp_up",
+    "treadmill": "walking"
+  },
   "mean": 54.15693278040778,
   "std": 19.653112667434243,
   "median": 50.55400084036509,

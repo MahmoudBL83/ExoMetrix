@@ -239,6 +239,43 @@ class _ClinicianDashboardState extends State<ClinicianDashboard> {
               const SizedBox(height: 24),
               _buildApiStatusCard(bleData),
               const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Chip(
+                      avatar: const Icon(Icons.route, size: 16),
+                      label: Text('Activity: ${bleData.lastActivityClass}'),
+                      backgroundColor: Colors.blue.withValues(alpha: 0.12),
+                    ),
+                    Chip(
+                      avatar: const Icon(Icons.psychology_alt_outlined, size: 16),
+                      label: Text('Intention: ${bleData.lastIntentionClass}'),
+                      backgroundColor: Colors.green.withValues(alpha: 0.12),
+                    ),
+                    Chip(
+                      avatar: const Icon(Icons.waves, size: 16),
+                      label: Text('Phase: ${bleData.lastGaitPhase}'),
+                      backgroundColor: Colors.cyan.withValues(alpha: 0.12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Chart Card
               Container(
@@ -396,6 +433,23 @@ class _ClinicianDashboardState extends State<ClinicianDashboard> {
                     subtitle: 'Requires attention',
                     icon: Icons.warning_amber_rounded,
                     color: Colors.redAccent,
+                  ),
+                  _buildStatCard(
+                    context,
+                    title: 'Toe Clearance',
+                    value: '${bleData.lastToeClearanceMm.toStringAsFixed(1)} mm',
+                    subtitle: 'Swing safety margin',
+                    icon: Icons.trending_up,
+                    color: Colors.teal,
+                  ),
+                  _buildStatCard(
+                    context,
+                    title: 'Cadence',
+                    value: '${bleData.lastCadenceSpm.toStringAsFixed(0)} spm',
+                    subtitle:
+                        'Confidence ${(bleData.lastModelConfidence * 100).toStringAsFixed(0)}%',
+                    icon: Icons.directions_run,
+                    color: Colors.deepPurple,
                   ),
                 ],
               ),

@@ -31,14 +31,25 @@ def predict():
         return jsonify({'error': 'No angle data provided'}), 400
         
     angle = float(data.get('angle', 0.0))
-    result = runtime.predict(angle)
+
+    angle_series = data.get('angle_series')
+    if not isinstance(angle_series, list):
+        angle_series = None
+
+    result = runtime.predict(angle, angle_series=angle_series)
 
     return jsonify({
         'classification': result['classification'],
         'assistance_percent': result['assistance_percent'],
         'anomaly_score': result.get('anomaly_score', 0.0),
         'model_loaded': result.get('model_loaded', False),
-        'received_angle': angle
+        'received_angle': angle,
+        'cadence_spm': result.get('cadence_spm', 0.0),
+        'toe_clearance_mm': result.get('toe_clearance_mm', 0.0),
+        'gait_phase': result.get('gait_phase', 'unknown'),
+        'activity_class': result.get('activity_class', 'unknown'),
+        'intention_class': result.get('intention_class', 'walking'),
+        'model_confidence': result.get('model_confidence', 0.0),
     })
 
 if __name__ == '__main__':

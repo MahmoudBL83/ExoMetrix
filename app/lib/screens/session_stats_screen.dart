@@ -86,6 +86,14 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
     csv.writeln('last_classification,${bleData.lastClassification}');
     csv.writeln(
         'last_assistance_percent,${bleData.lastAssistance.toStringAsFixed(2)}');
+    csv.writeln(
+      'last_toe_clearance_mm,${bleData.lastToeClearanceMm.toStringAsFixed(2)}');
+    csv.writeln('last_cadence_spm,${bleData.lastCadenceSpm.toStringAsFixed(2)}');
+    csv.writeln('last_gait_phase,${bleData.lastGaitPhase}');
+    csv.writeln('last_activity_class,${bleData.lastActivityClass}');
+    csv.writeln('last_intention_class,${bleData.lastIntentionClass}');
+    csv.writeln(
+      'model_confidence_percent,${(bleData.lastModelConfidence * 100).toStringAsFixed(2)}');
     csv.writeln('');
     csv.writeln('index,timestamp,angle_deg');
 
@@ -391,6 +399,12 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
                       Icons.monitor_heart_outlined),
                   _buildMetricCard('Captured Span',
                       _formatDuration(sampledDuration), Icons.schedule),
+                    _buildMetricCard(
+                      'Toe Clearance',
+                      '${bleData.lastToeClearanceMm.toStringAsFixed(1)} mm',
+                      Icons.trending_up),
+                    _buildMetricCard('Cadence',
+                      '${bleData.lastCadenceSpm.toStringAsFixed(0)} spm', Icons.directions_run),
                 ],
               ),
               const SizedBox(height: 20),
@@ -420,6 +434,14 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
                     Text('Last classification: ${bleData.lastClassification}'),
                     Text(
                         'Assistance prediction: ${bleData.lastAssistance.toStringAsFixed(1)}%'),
+                    Text(
+                      'Toe clearance: ${bleData.lastToeClearanceMm.toStringAsFixed(1)} mm'),
+                    Text('Cadence: ${bleData.lastCadenceSpm.toStringAsFixed(0)} spm'),
+                    Text('Gait phase: ${bleData.lastGaitPhase}'),
+                    Text('Activity class: ${bleData.lastActivityClass}'),
+                    Text('Intention class: ${bleData.lastIntentionClass}'),
+                    Text(
+                      'Model confidence: ${(bleData.lastModelConfidence * 100).toStringAsFixed(0)}%'),
                     Text(
                         'Session duration: ${_formatDuration(bleData.sessionDuration)}'),
                     if (samples.isNotEmpty)

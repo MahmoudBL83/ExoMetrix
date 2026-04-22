@@ -1,11 +1,15 @@
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Tuple
 
 import joblib
 import numpy as np
 from sklearn.ensemble import IsolationForest
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler
 
 try:
@@ -17,6 +21,24 @@ try:
     import h5py
 except Exception:  # pragma: no cover
     h5py = None
+
+
+FEATURE_NAMES = [
+    "mean_angle",
+    "std_angle",
+    "min_angle",
+    "max_angle",
+    "range_angle",
+    "median_angle",
+    "p10_angle",
+    "p90_angle",
+    "mean_abs_velocity",
+    "std_velocity",
+    "max_velocity",
+    "min_velocity",
+    "energy",
+    "peak_density",
+]
 
 
 def _extract_from_function_workspace(mat_obj) -> np.ndarray | None:
@@ -166,6 +188,173 @@ def _choose_signal(arrays: List[np.ndarray]) -> np.ndarray | None:
     return candidates[0][1]
 
 
+def _extract_best_signal(mat_obj, max_per_file: int | None = None) -> np.ndarray | None:
+    arrays = list(_iter_mat_values(mat_obj))
+    signal = _choose_signal(arrays)
+    if signal is None:
+        signal = _extract_from_function_workspace(mat_obj)
+    if signal is None:
+        return None
+
+    signal = np.asarray(signal, dtype=float)
+    signal = signal[np.isfinite(signal)]
+    signal = signal[(signal >= -220.0) & (signal <= 220.0)]
+    if signal.size < 40:
+        return None
+
+    if max_per_file is not None and signal.size > max_per_file:
+        step = max(1, signal.size // max_per_file)
+        signal = signal[::step][:max_per_file]
+
+    return signal.astype(float)
+
+
+def _count_peaks(values: np.ndarray) -> int:
+    if values.size < 3:
+        return 0
+
+    threshold = float(np.mean(values) + 0.25 * np.std(values))
+    peaks = 0
+    for i in range(1, values.size - 1):
+        if values[i] > values[i - 1] and values[i] >= values[i + 1] and values[i] > threshold:
+            peaks += 1
+    return peaks
+
+
+def _extract_window_features(values: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size < 6:
+        pad = np.full(6 - values.size, values[-1] if values.size else 0.0)
+        values = np.concatenate([values, pad], axis=0)
+
+    velocity = np.diff(values)
+    if velocity.size == 0:
+        velocity = np.array([0.0], dtype=float)
+
+    angle_range = float(np.max(values) - np.min(values))
+    peaks = _count_peaks(values)
+    peak_density = float(peaks / max(values.size, 1))
+
+    feature_vector = np.array(
+        [
+            float(np.mean(values)),
+            float(np.std(values)),
+            float(np.min(values)),
+            float(np.max(values)),
+            angle_range,
+            float(np.median(values)),
+            float(np.percentile(values, 10)),
+            float(np.percentile(values, 90)),
+            float(np.mean(np.abs(velocity))),
+            float(np.std(velocity)),
+            float(np.max(velocity)),
+            float(np.min(velocity)),
+            float(np.mean(np.square(values - np.mean(values)))),
+            peak_density,
+        ],
+        dtype=float,
+    )
+
+    return feature_vector
+
+
+def _derive_labels_from_path(mat_path: Path) -> Tuple[str, str]:
+    activity = mat_path.parents[1].name.lower()
+    stem = mat_path.stem.lower()
+
+    if activity == "levelground":
+        activity_class = "levelground"
+        intention_class = "running" if "_fast_" in stem else "walking"
+    elif activity == "stair":
+        activity_class = "stair"
+        intention_class = "upstairs"
+    elif activity == "ramp":
+        activity_class = "ramp"
+        intention_class = "ramp_up"
+    elif activity == "treadmill":
+        activity_class = "treadmill"
+        intention_class = "walking"
+    else:
+        activity_class = "unknown"
+        intention_class = "walking"
+
+    return activity_class, intention_class
+
+
+def _collect_labeled_feature_rows(
+    subject_root: Path,
+    max_per_file: int = 2000,
+) -> tuple[list[np.ndarray], list[str], list[str]]:
+    files = sorted(subject_root.rglob("gon/*.mat"))
+    feature_rows: list[np.ndarray] = []
+    activity_labels: list[str] = []
+    intention_labels: list[str] = []
+
+    for mat_path in files:
+        try:
+            mat_obj = _load_mat_file(mat_path)
+            signal = _extract_best_signal(mat_obj, max_per_file=max_per_file)
+            if signal is None:
+                continue
+
+            calibrated = _calibrate_to_app_angle_range(signal)
+            feature_rows.append(_extract_window_features(calibrated))
+            activity_class, intention_class = _derive_labels_from_path(mat_path)
+            activity_labels.append(activity_class)
+            intention_labels.append(intention_class)
+        except Exception as exc:
+            print(f"[WARN] Skipping labeled row from {mat_path.name}: {exc}")
+
+    return feature_rows, activity_labels, intention_labels
+
+
+def _train_classifier(
+    X: np.ndarray,
+    y: list[str],
+) -> tuple[RandomForestClassifier | None, dict]:
+    if X.size == 0 or len(y) == 0:
+        return None, {"classes": [], "val_accuracy": None}
+
+    class_counts = Counter(y)
+    if len(class_counts) < 2:
+        # Not enough label diversity for supervised classification.
+        return None, {
+            "classes": sorted(class_counts.keys()),
+            "val_accuracy": None,
+            "note": "insufficient_label_diversity",
+        }
+
+    clf = RandomForestClassifier(
+        n_estimators=350,
+        random_state=42,
+        class_weight="balanced_subsample",
+        n_jobs=-1,
+    )
+
+    metrics: dict = {
+        "classes": sorted(class_counts.keys()),
+        "val_accuracy": None,
+    }
+
+    min_count = min(class_counts.values())
+    if X.shape[0] >= 30 and min_count >= 2:
+        X_train, X_val, y_train, y_val = train_test_split(
+            X,
+            y,
+            test_size=0.2,
+            random_state=42,
+            stratify=y,
+        )
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_val)
+        metrics["val_accuracy"] = float(accuracy_score(y_val, y_pred))
+    else:
+        clf.fit(X, y)
+
+    return clf, metrics
+
+
 def _collect_angles(gon_dir: Path, max_per_file: int = 2000) -> np.ndarray:
     angles = []
     if gon_dir.name.lower() == "gon":
@@ -183,17 +372,9 @@ def _collect_angles(gon_dir: Path, max_per_file: int = 2000) -> np.ndarray:
     for mat_path in files:
         try:
             mat_obj = _load_mat_file(mat_path)
-            arrays = list(_iter_mat_values(mat_obj))
-            signal = _choose_signal(arrays)
-            if signal is None:
-                signal = _extract_from_function_workspace(mat_obj)
+            signal = _extract_best_signal(mat_obj, max_per_file=max_per_file)
             if signal is None:
                 continue
-
-            signal = signal[np.isfinite(signal)]
-            if signal.size > max_per_file:
-                step = max(1, signal.size // max_per_file)
-                signal = signal[::step][:max_per_file]
 
             angles.append(signal.astype(float))
         except Exception as exc:
@@ -240,16 +421,32 @@ def train_model(
     subject_roots = _resolve_subject_roots(dataset_root, subject_glob)
 
     raw_chunks = []
+    feature_rows: list[np.ndarray] = []
+    activity_labels: list[str] = []
+    intention_labels: list[str] = []
     source_subjects = []
     samples_per_subject = {}
+    feature_rows_per_subject = {}
 
     for subject_root in subject_roots:
         subject_name = subject_root.name
         raw = _collect_angles(subject_root)
         raw_chunks.append(raw)
+
+        subject_features, subject_activity, subject_intention = _collect_labeled_feature_rows(
+            subject_root
+        )
+        feature_rows.extend(subject_features)
+        activity_labels.extend(subject_activity)
+        intention_labels.extend(subject_intention)
+
         source_subjects.append(subject_name)
         samples_per_subject[subject_name] = int(raw.size)
+        feature_rows_per_subject[subject_name] = int(len(subject_features))
         print(f"[INFO] {subject_name}: collected {raw.size} samples")
+        print(
+            f"[INFO] {subject_name}: labeled feature windows {len(subject_features)}"
+        )
 
     raw_angles = np.concatenate(raw_chunks, axis=0)
     calibrated_angles = _calibrate_to_app_angle_range(raw_angles)
@@ -268,9 +465,29 @@ def train_model(
 
     scores = model.decision_function(X_scaled)
 
+    if feature_rows:
+        X_features = np.vstack(feature_rows).astype(float)
+    else:
+        X_features = np.zeros((0, len(FEATURE_NAMES)), dtype=float)
+
+    activity_classifier, activity_metrics = _train_classifier(
+        X_features,
+        activity_labels,
+    )
+    intention_classifier, intention_metrics = _train_classifier(
+        X_features,
+        intention_labels,
+    )
+
+    activity_label_counts = dict(sorted(Counter(activity_labels).items()))
+    intention_label_counts = dict(sorted(Counter(intention_labels).items()))
+
     artifact = {
         "model": model,
         "scaler": scaler,
+        "activity_classifier": activity_classifier,
+        "intention_classifier": intention_classifier,
+        "feature_names": FEATURE_NAMES,
         "angle_stats": {
             "mean": float(np.mean(calibrated_angles)),
             "std": float(np.std(calibrated_angles)),
@@ -288,9 +505,23 @@ def train_model(
             "source_subjects": source_subjects,
             "subject_count": len(source_subjects),
             "samples_per_subject": samples_per_subject,
+            "feature_rows_per_subject": feature_rows_per_subject,
             "sample_count": int(calibrated_angles.size),
             "model_type": "IsolationForest",
             "data_decoder": "function_workspace_f64_fallback",
+            "supports_activity_classification": activity_classifier is not None,
+            "supports_intention_classification": intention_classifier is not None,
+            "activity_label_counts": activity_label_counts,
+            "intention_label_counts": intention_label_counts,
+            "activity_classifier_metrics": activity_metrics,
+            "intention_classifier_metrics": intention_metrics,
+            "intention_mapping_policy": {
+                "levelground_fast": "running",
+                "levelground_normal_or_slow": "walking",
+                "stair": "upstairs",
+                "ramp": "ramp_up",
+                "treadmill": "walking",
+            },
         },
     }
 
@@ -304,6 +535,14 @@ def train_model(
     print(f"Model saved to: {output_model}")
     print(f"Metadata saved to: {output_meta}")
     print(f"Samples used: {calibrated_angles.size}")
+    print(
+        "Activity labels: "
+        + (str(activity_label_counts) if activity_label_counts else "none")
+    )
+    print(
+        "Intention labels: "
+        + (str(intention_label_counts) if intention_label_counts else "none")
+    )
 
 
 def main():

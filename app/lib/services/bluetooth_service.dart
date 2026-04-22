@@ -82,6 +82,12 @@ class BluetoothHandler extends ChangeNotifier {
   int _badSteps = 0;
   String _lastClassification = 'Waiting for data...';
   double _lastAssistance = 0.0;
+  double _lastCadenceSpm = 0.0;
+  double _lastToeClearanceMm = 0.0;
+  String _lastGaitPhase = 'unknown';
+  String _lastActivityClass = 'unknown';
+  String _lastIntentionClass = 'walking';
+  double _lastModelConfidence = 0.0;
   DateTime? _sessionStartedAt;
   final List<double> _angleHistory = [];
   final List<AngleSample> _sampleHistory = [];
@@ -98,6 +104,12 @@ class BluetoothHandler extends ChangeNotifier {
   int get badSteps => _badSteps;
   String get lastClassification => _lastClassification;
   double get lastAssistance => _lastAssistance;
+  double get lastCadenceSpm => _lastCadenceSpm;
+  double get lastToeClearanceMm => _lastToeClearanceMm;
+  String get lastGaitPhase => _lastGaitPhase;
+  String get lastActivityClass => _lastActivityClass;
+  String get lastIntentionClass => _lastIntentionClass;
+  double get lastModelConfidence => _lastModelConfidence;
   List<double> get angleHistory => List.unmodifiable(_angleHistory);
   List<AngleSample> get angleSamples => List.unmodifiable(_sampleHistory);
   String get apiBaseUrl => _apiBaseUrl;
@@ -196,6 +208,12 @@ class BluetoothHandler extends ChangeNotifier {
     _badSteps = 0;
     _lastClassification = 'Waiting for data...';
     _lastAssistance = 0.0;
+    _lastCadenceSpm = 0.0;
+    _lastToeClearanceMm = 0.0;
+    _lastGaitPhase = 'unknown';
+    _lastActivityClass = 'unknown';
+    _lastIntentionClass = 'walking';
+    _lastModelConfidence = 0.0;
     _sessionStartedAt = null;
     _angleHistory.clear();
     _sampleHistory.clear();
@@ -407,9 +425,24 @@ class BluetoothHandler extends ChangeNotifier {
   }
 
   // --- AI API Logic ---
-  void _applyClassification(String classification, double assistance) {
+  void _applyClassification(
+    String classification,
+    double assistance, {
+    double cadenceSpm = 0.0,
+    double toeClearanceMm = 0.0,
+    String gaitPhase = 'unknown',
+    String activityClass = 'unknown',
+    String intentionClass = 'walking',
+    double modelConfidence = 0.0,
+  }) {
     _lastClassification = classification;
     _lastAssistance = assistance;
+    _lastCadenceSpm = cadenceSpm;
+    _lastToeClearanceMm = toeClearanceMm;
+    _lastGaitPhase = gaitPhase;
+    _lastActivityClass = activityClass;
+    _lastIntentionClass = intentionClass;
+    _lastModelConfidence = modelConfidence;
 
     if (classification == 'Good step') {
       _goodSteps++;
@@ -432,8 +465,20 @@ class BluetoothHandler extends ChangeNotifier {
 
     final deviation = (angle - 70).abs();
     final assistance = (10 + deviation * 0.5).clamp(5.0, 85.0).toDouble();
+    final cadenceSpm = 88.0;
+    final toeClearanceMm = withinTargetWindow ? 18.0 : 9.0;
+    final gaitPhase = angle > 60 ? 'swing' : 'stance';
 
-    _applyClassification(classification, assistance);
+    _applyClassification(
+      classification,
+      assistance,
+      cadenceSpm: cadenceSpm,
+      toeClearanceMm: toeClearanceMm,
+      gaitPhase: gaitPhase,
+      activityClass: 'levelground',
+      intentionClass: withinTargetWindow ? 'walking' : 'upstairs',
+      modelConfidence: 0.55,
+    );
   }
 
   Future<void> _evaluateStepWithAI(double angle) async {
@@ -441,11 +486,17 @@ class BluetoothHandler extends ChangeNotifier {
     _isPredicting = true;
 
     try {
+      final start = math.max(0, _angleHistory.length - 60);
+      final angleSeries = _angleHistory.sublist(start);
+
       final response = await http
           .post(
             Uri.parse('$_apiBaseUrl/api/predict'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'angle': angle}),
+            body: jsonEncode({
+              'angle': angle,
+              'angle_series': angleSeries,
+            }),
           )
           .timeout(const Duration(seconds: 2));
 
@@ -453,14 +504,33 @@ class BluetoothHandler extends ChangeNotifier {
         final data = jsonDecode(response.body);
         final classification = data['classification']?.toString() ?? 'Unknown';
         final assistance = (data['assistance_percent'] ?? 0.0).toDouble();
+        final cadenceSpm =
+            (data['cadence_spm'] ?? data['cadence'] ?? 0.0).toDouble();
+        final toeClearanceMm =
+            (data['toe_clearance_mm'] ?? data['clearance'] ?? 0.0).toDouble();
+        final gaitPhase =
+            data['gait_phase']?.toString() ?? data['phase']?.toString() ?? 'unknown';
+        final activityClass = data['activity_class']?.toString() ?? 'unknown';
+        final intentionClass = data['intention_class']?.toString() ?? 'walking';
+        final modelConfidence =
+            (data['model_confidence'] ?? data['confidence'] ?? 0.0).toDouble();
 
         _apiReachable = true;
         _modelLoaded = data['model_loaded'] == true || _modelLoaded;
         _apiStatusDetail = _modelLoaded
-            ? 'Live predictions from trained model'
+            ? 'Live predictions: ${activityClass.toUpperCase()} / ${intentionClass.toUpperCase()}'
             : 'Live predictions from API';
 
-        _applyClassification(classification, assistance);
+        _applyClassification(
+          classification,
+          assistance,
+          cadenceSpm: cadenceSpm,
+          toeClearanceMm: toeClearanceMm,
+          gaitPhase: gaitPhase,
+          activityClass: activityClass,
+          intentionClass: intentionClass,
+          modelConfidence: modelConfidence,
+        );
       } else {
         _apiReachable = false;
         _modelLoaded = false;
@@ -480,6 +550,12 @@ class BluetoothHandler extends ChangeNotifier {
       } else {
         _lastClassification = 'API Offline';
         _lastAssistance = 0.0;
+        _lastCadenceSpm = 0.0;
+        _lastToeClearanceMm = 0.0;
+        _lastGaitPhase = 'unknown';
+        _lastActivityClass = 'unknown';
+        _lastIntentionClass = 'walking';
+        _lastModelConfidence = 0.0;
         notifyListeners();
       }
     } finally {

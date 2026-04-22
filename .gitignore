@@ -21,6 +21,10 @@ yarn-error.log*
 # ---------- Large local data artifacts ----------
 AB06/
 AB06.zip
+AB07/
+AB07.zip
+AB08/
+AB08.zip
 
 # ---------- Backend ML artifacts (large binaries) ----------
 backend/models/*.joblib

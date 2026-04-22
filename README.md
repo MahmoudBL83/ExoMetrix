@@ -192,6 +192,10 @@ From `backend/`:
 pip install -r requirements.txt
 python ml/train_gait_model.py --dataset-root ..
 python api/index.py
+
+$env:EXOMETRIX_MODEL_PATH="C:\mahmoud\college\backend\models\gait_model.joblib"
+$env:EXOMETRIX_PORT="5328"
+python api/index.py
 ```
 
 The training script now auto-discovers subject folders (for example `AB06`, `AB07`, `AB08`) when you pass a parent root.

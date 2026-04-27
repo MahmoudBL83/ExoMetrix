@@ -1,22 +1,13 @@
 {
-  "source": "..",
+  "source": "C:\\mahmoud\\college",
   "source_subjects": [
     "AB06",
     "AB07",
     "AB08"
   ],
   "subject_count": 3,
-  "samples_per_subject": {
-    "AB06": 286000,
-    "AB07": 306000,
-    "AB08": 276000
-  },
-  "feature_rows_per_subject": {
-    "AB06": 143,
-    "AB07": 153,
-    "AB08": 138
-  },
   "sample_count": 868000,
+  "window_count": 434,
   "model_type": "IsolationForest",
   "data_decoder": "function_workspace_f64_fallback",
   "supports_activity_classification": true,
@@ -33,31 +24,7 @@
     "upstairs": 120,
     "walking": 90
   },
-  "activity_classifier_metrics": {
-    "classes": [
-      "levelground",
-      "ramp",
-      "stair",
-      "treadmill"
-    ],
-    "val_accuracy": 0.9310344827586207
-  },
-  "intention_classifier_metrics": {
-    "classes": [
-      "ramp_up",
-      "running",
-      "upstairs",
-      "walking"
-    ],
-    "val_accuracy": 0.9310344827586207
-  },
-  "intention_mapping_policy": {
-    "levelground_fast": "running",
-    "levelground_normal_or_slow": "walking",
-    "stair": "upstairs",
-    "ramp": "ramp_up",
-    "treadmill": "walking"
-  },
+  "val_accuracy": 0.9310344827586207,
   "mean": 54.15693278040778,
   "std": 19.653112667434243,
   "median": 50.55400084036509,

@@ -451,26 +451,23 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
                           TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                     ),
                     const SizedBox(height: 8),
-                    Text('Last classification: ${bleData.lastClassification}'),
-                    Text(
-                        'Assistance prediction: ${bleData.lastAssistance.toStringAsFixed(1)}%'),
-                    Text(
-                      'Toe clearance: ${bleData.lastToeClearanceMm.toStringAsFixed(1)} mm'),
-                    Text('Cadence: ${bleData.lastCadenceSpm.toStringAsFixed(0)} spm'),
-                    Text('Gait phase: ${bleData.lastGaitPhase}'),
-                    Text('Activity class: ${bleData.lastActivityClass}'),
-                    Text('Intention class: ${bleData.lastIntentionClass}'),
-                    Text(
-                      'Model score: ${bleData.lastModelScore.toStringAsFixed(4)}'),
-                    Text(
-                      'Anomaly strength: ${(bleData.lastAnomalyStrength * 100).toStringAsFixed(1)}%'),
-                    Text(
-                      'Model confidence: ${(bleData.lastModelConfidence * 100).toStringAsFixed(0)}%'),
-                    Text(
-                        'Session duration: ${_formatDuration(bleData.sessionDuration)}'),
+                    _buildSnapshotRow('Classification', bleData.lastClassification, 
+                        bleData.lastClassification.contains('Good') ? Colors.green : Colors.red),
+                    _buildSnapshotRow('Assistance', '${bleData.lastAssistance.toStringAsFixed(1)}%', null),
+                    _buildSnapshotRow('Activity', _getActivityIcon(bleData.lastActivityClass) + ' ${bleData.lastActivityClass}', null),
+                    _buildSnapshotRow('Intention', _getIntentionIcon(bleData.lastIntentionClass) + ' ${bleData.lastIntentionClass}', null),
+                    _buildSnapshotRow('Gait phase', bleData.lastGaitPhase, null),
+                    _buildSnapshotRow('Toe clearance', '${bleData.lastToeClearanceMm.toStringAsFixed(1)} mm', null),
+                    _buildSnapshotRow('Cadence', '${bleData.lastCadenceSpm.toStringAsFixed(0)} spm', null),
+                    _buildSnapshotRow('Model score', bleData.lastModelScore.toStringAsFixed(4), 
+                        bleData.lastModelScore >= 0 ? Colors.green : Colors.red),
+                    _buildSnapshotRow('Anomaly', '${(bleData.lastAnomalyStrength * 100).toStringAsFixed(1)}%', 
+                        bleData.lastAnomalyStrength > 0.5 ? Colors.red : Colors.orange),
+                    _buildSnapshotRow('Confidence', '${(bleData.lastModelConfidence * 100).toStringAsFixed(0)}%', 
+                        _getConfidenceColor(bleData.lastModelConfidence)),
+                    Text('Session duration: ${_formatDuration(bleData.sessionDuration)}'),
                     if (samples.isNotEmpty)
-                      Text(
-                          'Latest sample: ${_formatTimestamp(samples.last.timestamp)}'),
+                      Text('Latest sample: ${_formatTimestamp(samples.last.timestamp)}'),
                   ],
                 ),
               ),
@@ -479,6 +476,41 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildSnapshotRow(String label, String value, Color? valueColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.w600, color: valueColor ?? Colors.black87)),
+        ],
+      ),
+    );
+  }
+
+  Color _getConfidenceColor(double confidence) {
+    if (confidence >= 0.8) return Colors.green;
+    if (confidence >= 0.5) return Colors.orange;
+    return Colors.red;
+  }
+
+  String _getActivityIcon(String activity) {
+    if (activity.contains('levelground') || activity.contains('walking')) return '🚶';
+    if (activity.contains('ramp')) return '↗️';
+    if (activity.contains('stair')) return '🪜';
+    if (activity.contains('treadmill')) return '🏃';
+    return '❓';
+  }
+
+  String _getIntentionIcon(String intention) {
+    if (intention.contains('walking') || intention.contains('levelground')) return '🚶';
+    if (intention.contains('up')) return '⬆️';
+    if (intention.contains('down')) return '⬇️';
+    if (intention.contains('run')) return '🏃';
+    return '❓';
   }
 
   Widget _buildMetricCard(String title, String value, IconData icon, {Color? color}) {

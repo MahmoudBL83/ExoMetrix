@@ -25,6 +25,10 @@
     "walking": 90
   },
   "val_accuracy": 0.9310344827586207,
+  "baseline_accuracy": 0.4482758620689655,
+  "cv_accuracy_mean": 0.9354717989842289,
+  "cv_accuracy_std": 0.011788988942169436,
+  "velocity_normalized": true,
   "mean": 54.15693278040778,
   "std": 19.653112667434243,
   "median": 50.55400084036509,

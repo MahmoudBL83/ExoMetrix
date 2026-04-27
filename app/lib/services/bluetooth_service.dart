@@ -82,6 +82,8 @@ class BluetoothHandler extends ChangeNotifier {
   int _badSteps = 0;
   String _lastClassification = 'Waiting for data...';
   double _lastAssistance = 0.0;
+  double _lastModelScore = 0.0;
+  double _lastAnomalyStrength = 0.0;
   double _lastCadenceSpm = 0.0;
   double _lastToeClearanceMm = 0.0;
   String _lastGaitPhase = 'unknown';
@@ -104,6 +106,8 @@ class BluetoothHandler extends ChangeNotifier {
   int get badSteps => _badSteps;
   String get lastClassification => _lastClassification;
   double get lastAssistance => _lastAssistance;
+  double get lastModelScore => _lastModelScore;
+  double get lastAnomalyStrength => _lastAnomalyStrength;
   double get lastCadenceSpm => _lastCadenceSpm;
   double get lastToeClearanceMm => _lastToeClearanceMm;
   String get lastGaitPhase => _lastGaitPhase;
@@ -208,6 +212,8 @@ class BluetoothHandler extends ChangeNotifier {
     _badSteps = 0;
     _lastClassification = 'Waiting for data...';
     _lastAssistance = 0.0;
+    _lastModelScore = 0.0;
+    _lastAnomalyStrength = 0.0;
     _lastCadenceSpm = 0.0;
     _lastToeClearanceMm = 0.0;
     _lastGaitPhase = 'unknown';
@@ -428,6 +434,8 @@ class BluetoothHandler extends ChangeNotifier {
   void _applyClassification(
     String classification,
     double assistance, {
+    double modelScore = 0.0,
+    double anomalyStrength = 0.0,
     double cadenceSpm = 0.0,
     double toeClearanceMm = 0.0,
     String gaitPhase = 'unknown',
@@ -437,6 +445,8 @@ class BluetoothHandler extends ChangeNotifier {
   }) {
     _lastClassification = classification;
     _lastAssistance = assistance;
+    _lastModelScore = modelScore;
+    _lastAnomalyStrength = anomalyStrength;
     _lastCadenceSpm = cadenceSpm;
     _lastToeClearanceMm = toeClearanceMm;
     _lastGaitPhase = gaitPhase;
@@ -465,6 +475,8 @@ class BluetoothHandler extends ChangeNotifier {
 
     final deviation = (angle - 70).abs();
     final assistance = (10 + deviation * 0.5).clamp(5.0, 85.0).toDouble();
+    final modelScore = withinTargetWindow ? 0.2 : -0.1;
+    final anomalyStrength = withinTargetWindow ? 0.0 : 0.85;
     final cadenceSpm = 88.0;
     final toeClearanceMm = withinTargetWindow ? 18.0 : 9.0;
     final gaitPhase = angle > 60 ? 'swing' : 'stance';
@@ -472,6 +484,8 @@ class BluetoothHandler extends ChangeNotifier {
     _applyClassification(
       classification,
       assistance,
+      modelScore: modelScore,
+      anomalyStrength: anomalyStrength,
       cadenceSpm: cadenceSpm,
       toeClearanceMm: toeClearanceMm,
       gaitPhase: gaitPhase,
@@ -504,6 +518,8 @@ class BluetoothHandler extends ChangeNotifier {
         final data = jsonDecode(response.body);
         final classification = data['classification']?.toString() ?? 'Unknown';
         final assistance = (data['assistance_percent'] ?? 0.0).toDouble();
+        final modelScore = (data['model_score'] ?? 0.0).toDouble();
+        final anomalyStrength = (data['anomaly_strength'] ?? 0.0).toDouble();
         final cadenceSpm =
             (data['cadence_spm'] ?? data['cadence'] ?? 0.0).toDouble();
         final toeClearanceMm =
@@ -524,6 +540,8 @@ class BluetoothHandler extends ChangeNotifier {
         _applyClassification(
           classification,
           assistance,
+          modelScore: modelScore,
+          anomalyStrength: anomalyStrength,
           cadenceSpm: cadenceSpm,
           toeClearanceMm: toeClearanceMm,
           gaitPhase: gaitPhase,
@@ -550,6 +568,8 @@ class BluetoothHandler extends ChangeNotifier {
       } else {
         _lastClassification = 'API Offline';
         _lastAssistance = 0.0;
+        _lastModelScore = 0.0;
+        _lastAnomalyStrength = 0.0;
         _lastCadenceSpm = 0.0;
         _lastToeClearanceMm = 0.0;
         _lastGaitPhase = 'unknown';

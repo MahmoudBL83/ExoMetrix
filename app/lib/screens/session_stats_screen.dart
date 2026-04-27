@@ -92,6 +92,8 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
     csv.writeln('last_gait_phase,${bleData.lastGaitPhase}');
     csv.writeln('last_activity_class,${bleData.lastActivityClass}');
     csv.writeln('last_intention_class,${bleData.lastIntentionClass}');
+    csv.writeln('last_model_score,${bleData.lastModelScore.toStringAsFixed(4)}');
+    csv.writeln('last_anomaly_strength,${bleData.lastAnomalyStrength.toStringAsFixed(4)}');
     csv.writeln(
       'model_confidence_percent,${(bleData.lastModelConfidence * 100).toStringAsFixed(2)}');
     csv.writeln('');
@@ -397,14 +399,32 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
                       'Stability',
                       '${bleData.stabilityScore.toStringAsFixed(1)}%',
                       Icons.monitor_heart_outlined),
-                  _buildMetricCard('Captured Span',
-                      _formatDuration(sampledDuration), Icons.schedule),
+                  _buildMetricCard(
+                      'Good Steps',
+                      bleData.goodSteps.toString(),
+                      Icons.check_circle_outline,
+                      color: Colors.green),
+                  _buildMetricCard(
+                      'Bad Steps',
+                      bleData.badSteps.toString(),
+                      Icons.cancel_outlined,
+                      color: Colors.red),
+                  _buildMetricCard(
+                      'Model Score',
+                      bleData.lastModelScore.toStringAsFixed(3),
+                      Icons.analytics_outlined,
+                      color: bleData.lastModelScore >= 0 ? Colors.green : Colors.red),
+                  _buildMetricCard(
+                      'Anomaly',
+                      '${(bleData.lastAnomalyStrength * 100).toStringAsFixed(0)}%',
+                      Icons.warning_amber_outlined,
+                      color: bleData.lastAnomalyStrength > 0.5 ? Colors.red : Colors.orange),
                     _buildMetricCard(
                       'Toe Clearance',
                       '${bleData.lastToeClearanceMm.toStringAsFixed(1)} mm',
                       Icons.trending_up),
                     _buildMetricCard('Cadence',
-                      '${bleData.lastCadenceSpm.toStringAsFixed(0)} spm', Icons.directions_run),
+                        '${bleData.lastCadenceSpm.toStringAsFixed(0)} spm', Icons.directions_run),
                 ],
               ),
               const SizedBox(height: 20),
@@ -441,6 +461,10 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
                     Text('Activity class: ${bleData.lastActivityClass}'),
                     Text('Intention class: ${bleData.lastIntentionClass}'),
                     Text(
+                      'Model score: ${bleData.lastModelScore.toStringAsFixed(4)}'),
+                    Text(
+                      'Anomaly strength: ${(bleData.lastAnomalyStrength * 100).toStringAsFixed(1)}%'),
+                    Text(
                       'Model confidence: ${(bleData.lastModelConfidence * 100).toStringAsFixed(0)}%'),
                     Text(
                         'Session duration: ${_formatDuration(bleData.sessionDuration)}'),
@@ -457,7 +481,7 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon) {
+  Widget _buildMetricCard(String title, String value, IconData icon, {Color? color}) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -475,14 +499,14 @@ class _SessionStatsScreenState extends State<SessionStatsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 18, color: Colors.blueGrey[700]),
+          Icon(icon, size: 18, color: color ?? Colors.blueGrey[700]),
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 16,
-              color: Colors.black87,
+              color: color ?? Colors.black87,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,

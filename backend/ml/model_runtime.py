@@ -248,6 +248,8 @@ class GaitModelRuntime:
             result.update(
                 {
                     "model_loaded": False,
+                    "model_score": 0.0,
+                    "anomaly_strength": 0.0,
                     "cadence_spm": round(cadence_spm, 1),
                     "toe_clearance_mm": round(toe_clearance_mm, 2),
                     "gait_phase": gait_phase,
@@ -285,6 +287,8 @@ class GaitModelRuntime:
         return {
             "classification": classification,
             "assistance_percent": round(float(assistance), 1),
+            "model_score": round(score, 4),
+            "anomaly_strength": round(anomaly_strength, 4),
             "anomaly_score": round(anomaly_strength, 4),
             "model_loaded": True,
             "cadence_spm": round(cadence_spm, 1),

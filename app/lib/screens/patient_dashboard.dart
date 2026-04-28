@@ -26,6 +26,21 @@ class PatientDashboard extends StatelessWidget {
       text: '30, 45, 60, 75, 90, 110, 140, 100, 70, 50',
     );
 
+    final Map<String, String> presets = {
+      'Normal Walking': '30, 45, 60, 75, 90, 110, 140, 100, 70, 50',
+      'Stair Ascent': '20, 35, 55, 80, 105, 115, 100, 85, 65, 40',
+      'Stair Descent': '90, 85, 70, 55, 40, 25, 30, 50, 70, 85',
+      'Ramp Ascent': '25, 40, 60, 85, 105, 120, 115, 95, 70, 45',
+      'Ramp Descent': '95, 90, 75, 55, 35, 20, 25, 45, 65, 80',
+      'Treadmill': '45, 55, 70, 85, 95, 100, 95, 85, 70, 55',
+      'Bad Step (Low)': '10, 15, 20, 25, 30, 15, 10, 5, 8, 12',
+      'Bad Step (High)': '140, 150, 160, 170, 165, 155, 145, 140, 150, 160',
+    };
+
+    void selectPreset(String name) {
+      controller.text = presets[name] ?? '';
+    }
+
     showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -35,6 +50,17 @@ class PatientDashboard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: presets.keys.map((name) => 
+                  ActionChip(
+                    label: Text(name, style: const TextStyle(fontSize: 11)),
+                    onPressed: () => selectPreset(name),
+                  )
+                ).toList(),
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: controller,
                 maxLines: 4,

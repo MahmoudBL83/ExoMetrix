@@ -102,8 +102,7 @@ class GaitModelRuntime:
         return {
             "loaded": False,
             "model_path": str(self.model_path),
-            "error": self.error or "Model not loaded",
-            "fallback": "heuristic",
+            "error": self.error or "Model not loaded - no fallback available",
         }
 
     def _prepare_window(self, angle: float, angle_series: list[float] | None = None) -> np.ndarray:
@@ -164,24 +163,6 @@ class GaitModelRuntime:
 
         return float(np.clip(clearance, 4.0, 70.0))
 
-    def _heuristic_activity_intention(
-        self,
-        angle: float,
-        cadence_spm: float,
-        window: np.ndarray,
-    ) -> tuple[str, str, float]:
-        variability = float(np.std(window)) if window.size else 0.0
-
-        if cadence_spm >= 150.0:
-            return "running", "running", 0.62
-        if angle >= 105.0 and cadence_spm >= 70.0:
-            return "stair", "upstairs", 0.58
-        if angle >= 90.0 and cadence_spm >= 60.0:
-            return "ramp", "ramp_up", 0.55
-        if 55.0 <= cadence_spm <= 130.0 and variability < 10.0 and window.size >= 20:
-            return "treadmill", "walking", 0.52
-        return "levelground", "walking", 0.56
-
     def _classifier_activity_intention(
         self,
         window: np.ndarray,
@@ -210,22 +191,6 @@ class GaitModelRuntime:
         except Exception:
             return None
 
-    def _heuristic_predict(self, angle: float) -> dict:
-        if -10 <= angle <= 150:
-            return {
-                "classification": "Good step",
-                "assistance_percent": 0.0,
-                "anomaly_score": 0.0,
-            }
-
-        overflow = max(abs(angle - 70.0) - 80.0, 0.0)
-        assistance = float(np.clip(20.0 + overflow * 0.6, 20.0, 90.0))
-        return {
-            "classification": "Compensating (bad) step",
-            "assistance_percent": round(assistance, 1),
-            "anomaly_score": round(min(1.0, assistance / 100.0), 4),
-        }
-
     def predict(self, angle: float, angle_series: list[float] | None = None) -> dict:
         angle = float(np.clip(angle, 0.0, 180.0))
         window = self._prepare_window(angle, angle_series=angle_series)
@@ -235,30 +200,25 @@ class GaitModelRuntime:
 
         classifier_result = self._classifier_activity_intention(window)
         if classifier_result is None:
-            activity_class, intention_class, model_confidence = self._heuristic_activity_intention(
-                angle,
-                cadence_spm,
-                window,
-            )
+            activity_class, intention_class, model_confidence = "unknown", "unknown", 0.0
         else:
             activity_class, intention_class, model_confidence = classifier_result
 
         if not self.loaded or self.artifact is None:
-            result = self._heuristic_predict(angle)
-            result.update(
-                {
-                    "model_loaded": False,
-                    "model_score": 0.0,
-                    "anomaly_strength": 0.0,
-                    "cadence_spm": round(cadence_spm, 1),
-                    "toe_clearance_mm": round(toe_clearance_mm, 2),
-                    "gait_phase": gait_phase,
-                    "activity_class": activity_class,
-                    "intention_class": intention_class,
-                    "model_confidence": round(model_confidence, 3),
-                }
-            )
-            return result
+            return {
+                "classification": "Unknown - model not loaded",
+                "assistance_percent": 0.0,
+                "model_score": 0.0,
+                "anomaly_strength": 0.0,
+                "model_loaded": False,
+                "cadence_spm": round(cadence_spm, 1),
+                "toe_clearance_mm": round(toe_clearance_mm, 2),
+                "gait_phase": gait_phase,
+                "activity_class": activity_class,
+                "intention_class": intention_class,
+                "model_confidence": round(model_confidence, 3),
+                "error": "Model not loaded - returning zeros",
+            }
 
         scaler = self.artifact["scaler"]
         model = self.artifact["model"]
